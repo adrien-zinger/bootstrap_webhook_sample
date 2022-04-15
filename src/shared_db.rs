@@ -100,25 +100,24 @@ impl SharedDB {
     /// a bootstrap, we keep it in memory (for now) and continue to send
     /// information of the range he asked for.
     pub async fn send_chunks(&self) {
-        // better subscription management can be defined here
+        // todo, better subscription management can be defined here
         // - remove the oldests subscribers (maybe an auto remove if stale)
         // - limit the number of subscriptions
         // - put all forward_all in an UnorderedFutures
         //   list to profit of concurrency
+        // - send a progression status to the remote
         let mut guard = self.0.lock().await;
-        let data = &guard.data;
-        let mut indexes = vec![];
-        for s in guard.subscribers.iter() {
-            if s.index == s.end {
+        for s in 0..guard.subscribers.len() {
+            if guard.subscribers[s].index == guard.subscribers[s].end {
                 continue;
             }
-            let chunk_size = min(MAX_CHUNK_SIZE, s.end - s.index);
-            let modifs = take_chunk(data, s.index, chunk_size);
-            forward_all(&s.addr, &modifs).await;
-            indexes.push(s.index + chunk_size);
-        }
-        for (s, index) in indexes.iter().enumerate() {
-            guard.subscribers[s].index = *index;
+            let chunk_size = min(
+                MAX_CHUNK_SIZE,
+                guard.subscribers[s].end - guard.subscribers[s].index,
+            );
+            let modifs = take_chunk(&guard.data, guard.subscribers[s].index, chunk_size);
+            forward_all(&guard.subscribers[s].addr, &modifs).await;
+            guard.subscribers[s].index += chunk_size;
         }
     }
 
