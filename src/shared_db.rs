@@ -11,6 +11,15 @@ pub enum EntryModif {
     Update((String, String)),
 }
 
+impl std::fmt::Debug for EntryModif {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EntryModif::Delete(d) => write!(f, "Delete({})", d),
+            EntryModif::Update((k, v)) => write!(f, "Update({}, {})", k, v),
+        }
+    }
+}
+
 /// Structure for the listener of the [DB]
 #[derive(Default)]
 pub struct Subscriber {
@@ -52,8 +61,10 @@ pub struct DB {
 pub struct SharedDB(Arc<Mutex<DB>>);
 
 impl SharedDB {
+    /// Remove a value from the database
     pub async fn remove(&self, key: &String) {
         let mut guard = self.0.lock().await;
+        println!("remove key: {}", key);
         guard.data.remove(key);
 
         // inform the bootstrapers of an update
@@ -64,13 +75,16 @@ impl SharedDB {
                 false => subscriber.end,
             };
             if pos >= subscriber.begin && end >= pos && pos <= subscriber.index {
+                println!("forward remove: {}--{}", &subscriber.addr, key);
                 forward_all(&subscriber.addr, &vec![EntryModif::Delete(key.clone())]).await;
             }
         }
     }
 
+    /// Update something in the database, insert if doesn't exist
     pub async fn update(&self, key: &String, value: &str) {
         let mut guard = self.0.lock().await;
+        println!("insert key: {} {}", key, value);
         guard.data.insert(key.clone(), value.to_string());
 
         // inform the bootstrapers of an update
@@ -80,7 +94,9 @@ impl SharedDB {
                 true => guard.data.len(),
                 false => subscriber.end,
             };
-            if pos >= subscriber.begin && end >= pos && pos <= subscriber.index {
+            if pos >= subscriber.begin && end >= pos {
+                // && pos <= subscriber.index {
+                println!("forward update {}: {} {}", &subscriber.addr, key, value);
                 forward_all(
                     &subscriber.addr,
                     &vec![EntryModif::Update((key.clone(), value.to_string()))],
@@ -88,12 +104,19 @@ impl SharedDB {
                 .await;
             }
         }
+        println!("quit insert function")
     }
 
+    /// Add a bootstrap client subscriber
     pub async fn add_subscriber(&self, mut subscriber: Subscriber) {
+        println!("add subscriber: {}", &subscriber.addr);
         let mut guard = self.0.lock().await;
-        subscriber.eof = guard.data.len() == subscriber.end;
+        if guard.data.len() <= subscriber.end {
+            subscriber.eof = true;
+            subscriber.end = 10000000;
+        }
         guard.subscribers.push(subscriber);
+        println!("subscriber added");
     }
 
     /// Send for each subscriber what they need, if a subscriber has finished
@@ -109,13 +132,17 @@ impl SharedDB {
         let guard = &mut *self.0.lock().await;
         for subscriber in guard.subscribers.iter_mut() {
             if subscriber.index == subscriber.end {
+                println!("pass subscriber {}", &subscriber.addr);
                 continue;
             }
             let chunk_size = min(MAX_CHUNK_SIZE, subscriber.end - subscriber.index);
-            let modifs = take_chunk(&guard.data, subscriber.index, chunk_size);
-            forward_all(&subscriber.addr, &modifs).await;
+            let chunk_modifs = take_chunk(&guard.data, subscriber.index, chunk_size);
+            println!("send chunk {}: {:?}", &subscriber.addr, &chunk_modifs);
+            forward_all(&subscriber.addr, &chunk_modifs).await;
+            println!("forward chunk successed");
             subscriber.index += chunk_size;
         }
+        println!("chunks sent");
     }
 
     pub async fn len(&self) -> usize {
@@ -123,9 +150,11 @@ impl SharedDB {
     }
 
     pub async fn dump(&self) {
+        print!("dump: ");
         for (key, value) in self.0.lock().await.data.iter() {
-            println!("{key} - {value}");
+            print!("{key}: {value};");
         }
+        println!();
     }
 }
 
@@ -137,6 +166,8 @@ fn take_chunk(data: &BTreeMap<String, String>, from: usize, size: usize) -> Vec<
         .collect()
 }
 
+/// Forward all modifications in `modifs` to the distant bootstraper client
+/// at `addr` (uri address)
 pub async fn forward_all(addr: &str, modifs: &Vec<EntryModif>) {
     let client = Client::new();
     let req = Request::builder()
@@ -147,26 +178,37 @@ pub async fn forward_all(addr: &str, modifs: &Vec<EntryModif>) {
     client.request(req).await.unwrap();
 }
 
+#[allow(dead_code)]
 /// Subscribe only to one target address
 pub async fn subscribe(to_addr: String, my_addr: String) {
     let client = Client::new();
     let size = size_request(&client, &to_addr).await;
     // 0: begin, size: end
+    //
     subscribe_request(&client, &to_addr, &my_addr, 0, size).await;
 }
 
-pub async fn _subscribe_multiple(to_addr: &[String], my_addr: String) {
+#[allow(dead_code)]
+pub async fn subscribe_multiple(to_addr: &[String], my_addr: String) {
     assert!(!to_addr.is_empty());
     let client = Client::new();
     let size = size_request(&client, &to_addr[0]).await;
     let c = size / to_addr.len();
     let mut i = 0;
     for t in to_addr {
-        subscribe_request(&client, t, &my_addr, i, i + c).await;
+        if i + c >= size {
+            // todo: fix that, we should send an eof signal instead of a big
+            // random value
+            i += c;
+            subscribe_request(&client, t, &my_addr, i, i << 1).await;
+            break;
+        } else {
+            subscribe_request(&client, t, &my_addr, i, i + c).await;
+        }
         i += c;
     }
     if i < size {
-        subscribe_request(&client, &to_addr[0], &my_addr, i, size).await;
+        subscribe_request(&client, &to_addr[0], &my_addr, i, size << 1).await;
     }
 }
 

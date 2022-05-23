@@ -55,7 +55,7 @@ If you want to run both, insertion script and bootstrapper server you can launch
 commands in parallel.
 
 ```bash
-# start one server 
+# start one server
 python insert_slow.py & cargo run -- 3001 3000
 
 # multiple servers
@@ -67,6 +67,30 @@ cargo run -- 3003 3002 # Ok, bootstrap from a bootstraper!
 
 Finally, you can check the consistency closing the servers with `ctrl-c`, the servers
 will dump in the output the data container `key - value`
+
+## Data visualization
+
+You can reproduce the data visualization for a better comprehension of the
+algorithm.
+
+First, run the script:
+
+```sh
+python ./insert.py
+```
+
+While the script is running, run the server executable like that:
+
+```sh
+target/release/server 3003 3000 3001 3002 > client.log
+```
+
+The bootstrap will start for the node `127.0.0.1:3003` with the synchronized
+nodes on ports `3000`, `3001` and `3002`. To be realists, the nodes are a bit
+desynchronized.
+
+Then you can open the visualization.html file in your favourite browser and
+look at the magic.
 
 ## Next steps
 

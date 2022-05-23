@@ -5,7 +5,7 @@ use hyper::{
 };
 use hyper::{Body, Request, Response, Server};
 use serde::Deserialize;
-use shared_db::{subscribe, EntryModif, SharedDB, Subscriber};
+use shared_db::{subscribe_multiple, EntryModif, SharedDB, Subscriber};
 use std::net::SocketAddr;
 use std::{convert::Infallible, time::Duration};
 mod shared_db;
@@ -16,6 +16,7 @@ pub const MAX_CHUNK_SIZE: usize = 20;
 async fn services_impl(req: Request<Body>, db: SharedDB) -> Result<Response<Body>, hyper::Error> {
     match (req.method(), req.uri().path()) {
         (&Method::POST, "/insert") => {
+            println!("receive insert");
             let modifs = deserialize::<Vec<EntryModif>>(&to_bytes(req.into_body()).await);
             for modif in modifs.iter() {
                 match modif {
@@ -29,6 +30,11 @@ async fn services_impl(req: Request<Body>, db: SharedDB) -> Result<Response<Body
             let (addr, begin, end) =
                 deserialize::<(String, usize, usize)>(&to_bytes(req.into_body()).await);
             spawn_bootstapper_sender(addr, begin, end, db.clone()).await;
+            Ok(Response::new(Body::default()))
+        }
+        // just make the node dumb his db
+        (&Method::POST, "/dump") => {
+            db.dump().await;
             Ok(Response::new(Body::default()))
         }
         (&Method::GET, "/size") => Ok(Response::new(Body::from(format!("{}", db.len().await)))),
@@ -49,6 +55,7 @@ pub async fn spawn_bootstapper_sender(addr: String, begin: usize, end: usize, db
     SPAWN_ONCE.call_once(|| {
         tokio::spawn(async move {
             loop {
+                println!("start chunks");
                 let f = async {
                     db.send_chunks().await;
                     tokio::time::sleep(BOOTSTRAP_SEND_PERIOD).await;
@@ -64,26 +71,27 @@ pub async fn spawn_bootstapper_sender(addr: String, begin: usize, end: usize, db
 }
 
 async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .expect("failed to install CTRL+C signal handler");
+    //tokio::signal::ctrl_c()
+    //    .await
+    //    .expect("failed to install CTRL+C signal handler");
+    tokio::time::sleep(Duration::from_secs(20)).await;
 }
 
-fn parse_input() -> (String, Option<String>) {
-    let args: Vec<String> = std::env::args().collect();
+fn parse_input() -> (String, Option<Vec<String>>) {
+    let mut args: Vec<String> = std::env::args().collect();
     if args.len() == 2 {
         (args[1].clone(), None)
-    } else if args.len() == 3 {
-        (args[1].clone(), Some(args[2].clone()))
+    } else if args.len() >= 3 {
+        (args[1].clone(), Some(args.drain(2..).collect()))
     } else {
-        println!("error usage:\ncargo run -- {{port}} {{optional bootstrap port}}");
+        println!("error usage:\ncargo run -- {{port}} {{optional bootstrap port}}*");
         std::process::exit(1);
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let (port, bootstrap_port) = parse_input();
+    let (port, bootstrap_ports) = parse_input();
     let addr = SocketAddr::from(([127, 0, 0, 1], port.parse::<u16>().unwrap()));
     let shared_database = SharedDB::default();
     let db = shared_database.clone();
@@ -107,8 +115,13 @@ async fn main() {
     );
     let server = Server::bind(&addr).serve(make_svc);
     let graceful = server.with_graceful_shutdown(shutdown_signal());
-    if let Some(p) = bootstrap_port {
-        subscribe(format!("127.0.0.1:{p}"), format!("127.0.0.1:{}", port)).await;
+    if let Some(ports) = bootstrap_ports {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let mports = ports
+            .iter()
+            .map(|port| format!("127.0.0.1:{port}"))
+            .collect::<Vec<String>>();
+        subscribe_multiple(&mports, format!("127.0.0.1:{port}")).await;
     }
     if let Err(e) = graceful.await {
         eprintln!("server error: {}", e);
