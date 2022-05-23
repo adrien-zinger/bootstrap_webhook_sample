@@ -89,6 +89,15 @@ The bootstrap will start for the node `127.0.0.1:3003` with the synchronized
 nodes on ports `3000`, `3001` and `3002`. To be realists, the nodes are a bit
 desynchronized.
 
+Then before enjoying a strange and obscure data visualization if you don't know
+the subject, please generate the new `js` files with
+
+```sh
+python log2json.py serv_0.log log_serv_0 > logs/serv_0.js
+python log2json.py serv_1.log log_serv_1 > logs/serv_1.js
+python log2json.py serv_2.log log_serv_2 > logs/serv_2.js
+```
+
 Then you can open the visualization.html file in your favourite browser and
 look at the magic.
 
