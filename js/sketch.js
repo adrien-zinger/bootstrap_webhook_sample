@@ -5,7 +5,7 @@ const log_sm = {
     serv_0: { pos: {x: 1, y: 50}, strokeColor: "#7a9de0" },
     serv_1: { pos: {x: 1, y: 150}, strokeColor: "#27dd95" },
     serv_2: { pos: {x: 1, y: 250}, strokeColor: "#fc6d47" },
-    client: { pos: {x: 1, y: 350}, key_vals: {} },
+    client: { pos: {x: 1, y: 350}, key_vals: {}, cache: {} },
 
     init() {
 	this.serv_0.logs = JSON.parse(log_serv_0);
@@ -31,7 +31,8 @@ const log_sm = {
     /// Show all server and client
     show() {
 	fill(0);
-	text(`insert ${this.serv_0.logs[this.pos].insert}`, 50, 30);
+	noStroke();
+	text(`Insert/Update ${this.serv_0.logs[this.pos].insert}`, 50, 30);
 	this.serv_0.show(this.pos);
 	this.client.concat(this.serv_0.logs[this.pos].chunk, this.serv_0.strokeColor);
 	this.client.forward(this.serv_0.logs[this.pos].forwards, this.serv_0.strokeColor);
@@ -41,15 +42,24 @@ const log_sm = {
 	this.serv_2.show(this.pos);
 	this.client.concat(this.serv_2.logs[this.pos].chunk, this.serv_2.strokeColor);
 	this.client.forward(this.serv_2.logs[this.pos].forwards, this.serv_2.strokeColor);
-	this.client.show();
+	this.client.show(this.pos);
     },
 };
 
 const client = {
-    show() {
-	let keys = Object.keys(this.key_vals).sort();
+    show(pos) {
+	if (this.cache[pos] === undefined) {
+	    this.cache[pos] = JSON.stringify(this.key_vals);
+	    this.show_kv(this.key_vals);
+	} else {
+	    this.show_kv(JSON.parse(this.cache[pos]));
+	}
+    },
+
+    show_kv(key_vals) {
+	let keys = Object.keys(key_vals).sort();
 	for (let i = 0; i < keys.length; ++i) {
-	    let o = this.key_vals[keys[i]];
+	    let o = key_vals[keys[i]];
 	    let color = "#" + map(o.val, 0, 999, 0, 999999);
 	    stroke(o.strokeColor);
 	    fill(color);
@@ -81,7 +91,10 @@ const serv = {
 	    console.warn(`log undefined at pos ${pos}`)
 	for (let i = 0; i < log.dump.length; ++i) {
 	    let color = "#" + map(log.dump[i][1], 0, 999, 0, 999999);
-	    stroke(this.strokeColor);
+	    if (this.logs[pos].insert[0] === log.dump[i][0])
+		stroke("red");
+	    else stroke(this.strokeColor);
+
 	    fill(color);
 	    let x = (i * 20) % 600;
 	    rect(this.pos.x + x, this.pos.y + Math.floor(i * 20 / 600) * 20, 20, 18);

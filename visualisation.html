@@ -7,11 +7,34 @@
     <script src="logs/serv_1.js"></script>
     <script src="logs/serv_2.js"></script>
     <script src="js/sketch.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 </head>
 
 <body>
     <main>
     </main>
+
+
+    <button style="font-size:24px" onclick="backward()" class="fa">&#xf048;</button>
+    <button style="font-size:24px" onclick="my_play()" class="fa">&#xf04b;</button>
+    <button style="font-size:24px" onclick="forward()" class="fa">&#xf051;</button>
+
+    <script>
+	function my_play() {
+	    log_sm.play = true;
+	}
+
+	function forward() {
+	    log_sm.play = false;
+	    if (log_sm.pos < log_sm.max - 1)
+		log_sm.pos++;
+	}
+	function backward() {
+	    log_sm.play = false;
+	    if (log_sm.pos > 0)
+		log_sm.pos--;
+	}
+    </script>
 </body>
 
 </html>
