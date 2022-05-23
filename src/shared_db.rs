@@ -195,20 +195,20 @@ pub async fn subscribe_multiple(to_addr: &[String], my_addr: String) {
     let size = size_request(&client, &to_addr[0]).await;
     let c = size / to_addr.len();
     let mut i = 0;
-    for t in to_addr {
-        if i + c >= size {
+    let mut it_target_addr = to_addr.iter();
+    while i < size {
+        let t = it_target_addr.next().unwrap();
+        if i + (c << 1) >= size {
             // todo: fix that, we should send an eof signal instead of a big
             // random value
-            i += c;
-            subscribe_request(&client, t, &my_addr, i, i << 1).await;
+            println!("big require to {}, for {} to {}", t, i, size << 1);
+            subscribe_request(&client, t, &my_addr, i, size << 1).await;
             break;
         } else {
+            println!("require to {}, for {} to {}", t, i, i + c);
             subscribe_request(&client, t, &my_addr, i, i + c).await;
         }
         i += c;
-    }
-    if i < size {
-        subscribe_request(&client, &to_addr[0], &my_addr, i, size << 1).await;
     }
 }
 
