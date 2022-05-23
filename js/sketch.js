@@ -2,10 +2,10 @@ const log_sm = {
     pos: 0,
     max: 0,
     play: true,
-    serv_0: { pos: {x: 1, y: 50}, strokeColor: "#7a9de0" },
-    serv_1: { pos: {x: 1, y: 150}, strokeColor: "#27dd95" },
-    serv_2: { pos: {x: 1, y: 250}, strokeColor: "#fc6d47" },
-    client: { pos: {x: 1, y: 350}, key_vals: {}, cache: {} },
+    serv_0: { pos: {x: 1, y: 20}, strokeColor: "#7a9de0" },
+    serv_1: { pos: {x: 1, y: 100}, strokeColor: "#27dd95" },
+    serv_2: { pos: {x: 1, y: 180}, strokeColor: "#fc6d47" },
+    client: { pos: {x: 1, y: 260}, key_vals: {}, cache: {} },
 
     init() {
 	this.serv_0.logs = JSON.parse(log_serv_0);
@@ -31,8 +31,8 @@ const log_sm = {
     /// Show all server and client
     show() {
 	fill(0);
-	noStroke();
-	text(`Insert/Update ${this.serv_0.logs[this.pos].insert}`, 50, 30);
+	//noStroke();
+	//text(`Insert/Update ${this.serv_0.logs[this.pos].insert}`, 50, 30);
 	this.serv_0.show(this.pos);
 	this.client.concat(this.serv_0.logs[this.pos].chunk, this.serv_0.strokeColor);
 	this.client.forward(this.serv_0.logs[this.pos].forwards, this.serv_0.strokeColor);
@@ -104,8 +104,8 @@ const serv = {
 
 function setup() {
     createCanvas(600, 800);
-    frameRate(2);
-    strokeWeight(4);
+    frameRate(3);
+    strokeWeight(2);
     log_sm.init();
 }
 

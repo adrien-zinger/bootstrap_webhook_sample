@@ -10,8 +10,8 @@ use std::net::SocketAddr;
 use std::{convert::Infallible, time::Duration};
 mod shared_db;
 
-pub const BOOTSTRAP_SEND_PERIOD: Duration = Duration::from_secs(1);
-pub const MAX_CHUNK_SIZE: usize = 20;
+pub const BOOTSTRAP_SEND_PERIOD: Duration = Duration::from_millis(100);
+pub const MAX_CHUNK_SIZE: usize = 5;
 
 async fn services_impl(req: Request<Body>, db: SharedDB) -> Result<Response<Body>, hyper::Error> {
     match (req.method(), req.uri().path()) {
@@ -74,7 +74,7 @@ async fn shutdown_signal() {
     //tokio::signal::ctrl_c()
     //    .await
     //    .expect("failed to install CTRL+C signal handler");
-    tokio::time::sleep(Duration::from_secs(20)).await;
+    tokio::time::sleep(Duration::from_secs(40)).await;
 }
 
 fn parse_input() -> (String, Option<Vec<String>>) {

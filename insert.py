@@ -55,7 +55,7 @@ print("Start client!")
 # Hop we continue to fill the servers :)
 fill_servers(100, False)
 
-for serv in serv_procs:
-    os.killpg(os.getpgid(serv.pid), signal.SIGTERM)
+# for serv in serv_procs:
+#    os.killpg(os.getpgid(serv.pid), signal.SIGTERM)
 
 # os.killpg(os.getpgid(client.pid), signal.SIGTERM)
